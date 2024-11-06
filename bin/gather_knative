@@ -6,6 +6,7 @@ set -Euox pipefail
 
 BIN=oc
 LOGS_DIR=${LOGS_DIR:-must-gather-logs}
+SYSTEM_NAMESPACES=(knative-eventing knative-serving knative-serving-ingress)
 
 # Describe and Get all api resources of Serverless across cluster
 
@@ -19,16 +20,20 @@ do
     mkdir -p ${LOGS_DIR}/${NAMESPACE}/${APIRESOURCE}
     ${BIN} describe ${APIRESOURCE} -n ${NAMESPACE} > ${LOGS_DIR}/${NAMESPACE}/${APIRESOURCE}/describe.log
     ${BIN} get ${APIRESOURCE} -n ${NAMESPACE} -o=yaml > ${LOGS_DIR}/${NAMESPACE}/${APIRESOURCE}/get.yaml
+    if [[ ! ${SYSTEM_NAMESPACES[*]} =~ "${NAMESPACE}" ]]; then
+      if [[ ! -f ${LOGS_DIR}/namespaces/${NAMESPACE}/${NAMESPACE}.yaml ]]; then
+        echo "Inspecting ${NAMESPACE}"
+        ${BIN} adm inspect namespace ${NAMESPACE} --dest-dir=${LOGS_DIR}
+      fi
+    fi
   done
 done
 
-
 # Collect oc adm inspect and extra resources in knative system namespaces.
 
-NAMESPACES=(knative-eventing knative-serving knative-serving-ingress)
 APIRESOURCES=(roles rolebindings serviceaccounts leases)
 
-for NAMESPACE in ${NAMESPACES[@]}
+for NAMESPACE in ${SYSTEM_NAMESPACES[@]}
 do
   ${BIN} adm inspect namespace ${NAMESPACE} --dest-dir=${LOGS_DIR}
   for APIRESOURCE in ${APIRESOURCES[@]}
